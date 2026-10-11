@@ -74,79 +74,70 @@ footer{text-align:center;color:#888;font-size:11px;line-height:1.7;margin-top:20
 </head>
 
 <body>
-<main class="card">
-
-  <div class="brand">
-    <div class="logo">☎</div>
-    <div>
-      <strong>Home Credit India</strong>
-      <small>Customer assistance</small>
-    </div>
+  <h2>Bolna Web-Call SDK v2</h2>
+  <label for="sessionUrl">Session endpoint (your backend — never a bn- key here)</label>
+  <input
+  id="sessionUrl"
+  type="hidden"
+  value="https://web-call-carx.onrender.com/session"
+/>
+  <div class="row">
+    <button id="call">📞 Call</button>
+    <button id="mute" disabled>Mute</button>
   </div>
+  <div id="meter"><div></div></div>
+  <div id="log">idle</div>
 
-  <div class="tag">VOICE ASSISTANT</div>
-  <h1>Talk to Ananya</h1>
-  <p class="desc">
-    Connect with our virtual assistant to discuss your
-    Loan Against Property eligibility. Allow microphone
-    access when prompted.
-  </p>
+  <script src="../dist/bolna-web-call.min.js"></script>
+  <script>
+    const logEl = document.getElementById('log');
+    const callBtn = document.getElementById('call');
+    const muteBtn = document.getElementById('mute');
+    const meterBar = document.querySelector('#meter > div');
+    const log = (...a) => { logEl.textContent += '\n' + a.join(' '); logEl.scrollTop = logEl.scrollHeight; };
 
-  <section class="panel">
-    <div class="status">
-      <span class="dot" id="dot"></span>
-      <span id="statusText">Ready to connect</span>
-    </div>
+    let call = null;
 
-    <input
-      id="sessionUrl"
-      type="hidden"
-      value="https://web-call-carx.onrender.com/session"
-    >
+    callBtn.onclick = async () => {
+      if (call && call.getState() === 'active') { await call.stop(); return; }
 
-    <div class="row">
-      <button id="call">☎ Start a call</button>
-      <button id="mute" disabled>Mute</button>
-    </div>
+      if (typeof BolnaWebCall === 'undefined') {
+        log('ERROR: SDK bundle failed to load — run `npm run build` and serve from the repo root (see the comment at the top of this file)');
+        return;
+      }
 
-    <div id="meter"><div></div></div>
+      call = new BolnaWebCall({
+        sessionUrl: document.getElementById('sessionUrl').value.trim(),
+        debug: false,
+      });
+      call.on('state-change', (s) => log('state:', s));
+      call.on('media-permission', () => log('mic permission granted'));
+      call.on('call-start', () => {
+        log('>>> connected — talk to the agent (run_id ' + call.getRunId() + ')');
+        callBtn.textContent = 'Hang up';
+        callBtn.classList.add('active');
+        muteBtn.disabled = false;
+      });
+      call.on('call-end', ({ reason }) => {
+        log('call ended:', reason);
+        callBtn.textContent = '📞 Call';
+        callBtn.classList.remove('active');
+        muteBtn.disabled = true;
+        muteBtn.textContent = 'Mute';
+        meterBar.style.width = '0';
+      });
+      call.on('error', (e) => log('ERROR', e.code + ':', e.message, e.scope ? '(' + e.scope + ')' : ''));
+      call.on('volume-level', (v) => { meterBar.style.width = Math.round(v * 100) + '%'; });
 
-    <div class="logtitle">CALL ACTIVITY</div>
-    <div id="log">Ready when you are.</div>
-  </section>
+      callBtn.disabled = true;
+      try { await call.start({ userData: (() => { try { return JSON.parse($('userData').value || 'null') || undefined; } catch { return undefined; } })() }); } catch {} finally { callBtn.disabled = false; }
+    };
 
-  <footer>
-    Home Credit India · Virtual Assistant Demo
-  </footer>
-
-</main>
-
-<script src="../dist/bolna-web-call.min.js"></script>
-<script>
-const logEl=document.getElementById('log');
-const callBtn=document.getElementById('call');
-const muteBtn=document.getElementById('mute');
-const meterBar=document.querySelector('#meter>div');
-const dot=document.getElementById('dot');
-const statusText=document.getElementById('statusText');
-const log=(...a)=>{logEl.textContent+='\n'+a.join(' ');logEl.scrollTop=logEl.scrollHeight};
-const setStatus=(text,color='#aaa')=>{statusText.textContent=text;dot.style.background=color};
-let call=null;
-callBtn.onclick=async()=>{
- if(call&&call.getState()==='active'){await call.stop();return}
- if(typeof BolnaWebCall==='undefined'){log('ERROR: SDK failed to load. Check the SDK bundle.');setStatus('SDK unavailable','#d71920');return}
- call=new BolnaWebCall({sessionUrl:document.getElementById('sessionUrl').value.trim(),debug:false});
- call.on('state-change',s=>{log('State:',s);if(s==='connecting')setStatus('Connecting…','#e7a321');if(s==='ringing')setStatus('Calling Ananya…','#e7a321');if(s==='active')setStatus('Call connected','#16a34a');if(s==='ended')setStatus('Call ended','#888')});
- call.on('media-permission',()=>log('Microphone permission granted'));
- call.on('call-start',()=>{log('Connected — you can speak to Ananya. Run ID:',call.getRunId());callBtn.textContent='Hang up';callBtn.classList.add('active');muteBtn.disabled=false;setStatus('Call connected','#16a34a')});
- call.on('call-end',({reason})=>{log('Call ended:',reason);callBtn.textContent='☎  Start a call';callBtn.classList.remove('active');muteBtn.disabled=true;muteBtn.textContent='Mute';meterBar.style.width='0';setStatus('Ready to connect','#aaa')});
- call.on('error',e=>{log('ERROR',e.code+':',e.message,e.scope?'('+e.scope+')':'');setStatus('Connection error','#d71920')});
- call.on('volume-level',v=>meterBar.style.width=Math.round(v*100)+'%');
- callBtn.disabled=true;
- try{await call.start()}catch(e){log('Unable to start call:',e?.message||'Please try again');setStatus('Unable to connect','#d71920')}
- finally{callBtn.disabled=false}
-};
-muteBtn.onclick=()=>{if(!call)return;call.setMuted(!call.isMuted());muteBtn.textContent=call.isMuted()?'Unmute':'Mute';log(call.isMuted()?'Microphone muted':'Microphone unmuted')};
-</script>
+    muteBtn.onclick = () => {
+      call.setMuted(!call.isMuted());
+      muteBtn.textContent = call.isMuted() ? 'Unmute' : 'Mute';
+      log(call.isMuted() ? 'muted' : 'unmuted');
+    };
+  </script>
 </body>
 </html>
