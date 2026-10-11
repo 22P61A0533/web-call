@@ -226,7 +226,11 @@
 <body>
   <h2>Bolna Web-Call SDK v2</h2>
   <label for="sessionUrl">Session endpoint (your backend — never a bn- key here)</label>
-  <input id="sessionUrl" value="https://web-call-carx.onrender.com/session" />
+  <input
+  id="sessionUrl"
+  type="hidden"
+  value="https://web-call-carx.onrender.com/session"
+/>
   <div class="row">
     <button id="call">📞 Call</button>
     <button id="mute" disabled>Mute</button>
